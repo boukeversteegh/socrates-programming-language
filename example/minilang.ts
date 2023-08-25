@@ -8,8 +8,8 @@ export function tokenize(source: string) {
         if (match) return {type, value: match[0]};
         return null;
     }
-    while(offset < source.length) {
 
+    while (offset < source.length) {
         const token = null
             ?? tryMatch('NAME', /^[a-z]+/)
             ?? tryMatch('WHITESPACE', /^\s/)
@@ -22,7 +22,6 @@ export function tokenize(source: string) {
         if (token) {
             offset += token.value.length;
             if (token.type !== 'WHITESPACE') tokens.push(token);
-            continue;
         }
 
         throw new Error(`Unexpected token '${source[offset]}' at offset ${offset}`);
@@ -42,70 +41,61 @@ export function parse(tokens) {
         return token.value;
     }
 
-    function ASSIGNMENT() {
-        const variable = token('NAME')
-        token('ASSIGN')
-        const value = VALUE();
-
-        return {
-            type: 'ASSIGN',
-            variable: variable,
-            value: value
-        }
-    }
-
-    function VARIABLE() {
-        return {
-            type: 'VARIABLE',
-            name: token('NAME'),
-        }
-    }
-
     function tryRule(rule) {
         const _offset = offset;
         try {
             return rule();
-        } catch (e ) {
+        } catch (e) {
             offset = _offset;
             return null;
         }
     }
 
-    function VALUE() {
-        return tryRule(NUMBER) ?? tryRule(CALL) ?? VARIABLE()
+    const rules = {
+        ASSIGNMENT() {
+            const variable = token('NAME')
+            token('ASSIGN')
+            const value = rules.VALUE();
+
+            return {
+                type: 'ASSIGN',
+                variable: variable,
+                value: value
+            }
+        },
+        VARIABLE: () => ({
+            type: 'VARIABLE',
+            name: token('NAME'),
+        }),
+        VALUE: () => tryRule(rules.NUMBER) ?? tryRule(rules.CALL) ?? rules.VARIABLE(),
+        CALL() {
+            const name = token('NAME');
+
+            token('OPEN')
+            const args = []
+            while (tokens[offset].type !== 'CLOSE') {
+                const argValue = rules.VALUE();
+                args.push(argValue);
+                if (tokens[offset].type !== 'CLOSE') token('COMMA');
+            }
+            token('CLOSE');
+
+            return {
+                type: 'CALL',
+                arguments: args,
+                name: name,
+            }
+        },
+        NUMBER() {
+            const value = token('NUMBER')
+            return {
+                type: 'NUMBER',
+                value: parseInt(value)
+            }
+        }
     }
 
-    function CALL() {
-        const name = token('NAME');
-        token('OPEN')
-
-        // arguments
-        const args = []
-        while(tokens[offset].type !== 'CLOSE') {
-            const argValue = VALUE();
-            args.push(argValue);
-
-            if (tokens[offset].type !== 'CLOSE') token('COMMA');
-        }
-
-        token('CLOSE');
-
-        return {
-            type: 'CALL',
-            arguments: args,
-            name: name,
-        }
-    }
-
-    function NUMBER() {
-        const value = token('NUMBER')
-        return {
-            type: 'NUMBER',
-            value: parseInt(value)
-        }
-    }
-
-    return ASSIGNMENT();
+    return rules.ASSIGNMENT();
 }
 
 
@@ -118,7 +108,7 @@ export function compile(node) {
                 return node.arguments.map(compile).join(' + ')
             }
             const args = node.arguments.map(compile).join(', ')
-            return`${node.name}(${args})`;
+            return `${node.name}(${args})`;
         case 'NUMBER':
             return `${node.value}`
         default:
