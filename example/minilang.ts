@@ -1,14 +1,12 @@
 export function tokenize(source: string) {
-    const tokens = [];
-
     let offset = 0;
 
     function tryMatch(type, pattern) {
         let match = source.slice(offset).match(pattern);
-        if (match) return {type, value: match[0]};
-        return null;
+        return match ? {type, value: match[0]} : null;
     }
 
+    const tokens = [];
     while (offset < source.length) {
         const token = null
             ?? tryMatch('NAME', /^[a-z]+/)
@@ -19,17 +17,14 @@ export function tokenize(source: string) {
             ?? tryMatch('NUMBER', /^\d+/)
             ?? tryMatch('CLOSE', /^\)/)
 
-        if (token) {
-            offset += token.value.length;
-            if (token.type !== 'WHITESPACE') tokens.push(token);
-        }
+        if (!token) throw new Error(`Unexpected token '${source[offset]}' at offset ${offset}`);
 
-        throw new Error(`Unexpected token '${source[offset]}' at offset ${offset}`);
+        offset += token.value.length;
+        if (token.type !== 'WHITESPACE') tokens.push(token);
     }
 
     return tokens;
 }
-
 
 export function parse(tokens) {
     let offset = 0;
@@ -47,7 +42,6 @@ export function parse(tokens) {
             return rule();
         } catch (e) {
             offset = _offset;
-            return null;
         }
     }
 
@@ -56,17 +50,9 @@ export function parse(tokens) {
             const variable = token('NAME')
             token('ASSIGN')
             const value = rules.VALUE();
-
-            return {
-                type: 'ASSIGN',
-                variable: variable,
-                value: value
-            }
+            return {type: 'ASSIGN', variable: variable, value: value}
         },
-        VARIABLE: () => ({
-            type: 'VARIABLE',
-            name: token('NAME'),
-        }),
+        VARIABLE: () => ({type: 'VARIABLE', name: token('NAME')}),
         VALUE: () => tryRule(rules.NUMBER) ?? tryRule(rules.CALL) ?? rules.VARIABLE(),
         CALL() {
             const name = token('NAME');
@@ -80,18 +66,11 @@ export function parse(tokens) {
             }
             token('CLOSE');
 
-            return {
-                type: 'CALL',
-                arguments: args,
-                name: name,
-            }
+            return {type: 'CALL', arguments: args, name: name}
         },
         NUMBER() {
             const value = token('NUMBER')
-            return {
-                type: 'NUMBER',
-                value: parseInt(value)
-            }
+            return {type: 'NUMBER', value: parseInt(value)}
         }
     }
 
