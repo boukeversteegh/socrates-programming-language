@@ -86,9 +86,9 @@ describe('compiler', () => {
             'let a = foo(foo(1, 2), foo(3, 4))'
         )
     });
-    it('a = add(add(1, 2), add(3, 4))', () => {
-        expect(compile(parse(tokenize('a = add(add(1, 2), add(3, 4))')))).toEqual(
-            'let a = 1 + 2 + 3 + 4'
+    it('a = add(add(1, 2), add(3, b))', () => {
+        expect(compile(parse(tokenize('a = add(add(1, 2), add(3, b))')))).toEqual(
+            'let a = 1 + 2 + 3 + b'
         )
     });
 

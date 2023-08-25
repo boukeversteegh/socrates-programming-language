@@ -90,6 +90,8 @@ export function compile(node) {
             return `${node.name}(${args})`;
         case 'NUMBER':
             return `${node.value}`
+        case 'VARIABLE':
+            return `${node.name}`
         default:
             throw new Error(`Unknown node type: ${node.type}`)
     }
