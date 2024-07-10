@@ -16,6 +16,7 @@ export function tokenize(source: string) {
             ?? tryMatch('COMMA', /^,/)
             ?? tryMatch('NUMBER', /^\d+/)
             ?? tryMatch('CLOSE', /^\)/)
+            ?? tryMatch('STRING', /^"[^"]*"/)
 
         if (!token) throw new Error(`Unexpected token '${source[offset]}' at offset ${offset}`);
 
@@ -31,7 +32,7 @@ export function parse(tokens) {
 
     function token(type) {
         const token = tokens[offset];
-        if (token.type !== type) throw new Error(`unexpected token: ${JSON.stringify(token)} after: ${offset}`);
+        if (token.type !== type) throw new Error(`unexpected token: ${JSON.stringify(token)} after: ${offset}. Expected token was ${type}`);
         offset++;
         return token.value;
     }
@@ -53,11 +54,19 @@ export function parse(tokens) {
             return {type: 'ASSIGN', variable: variable, value: value}
         },
         VARIABLE: () => ({type: 'VARIABLE', name: token('NAME')}),
-        VALUE: () => tryRule(rules.NUMBER) ?? tryRule(rules.CALL) ?? rules.VARIABLE(),
+        VALUE: () => null
+            ?? tryRule(rules.NUMBER)
+            ?? tryRule(rules.CALL)
+            ?? tryRule(rules.VARIABLE)
+            ?? rules.STRING(),
+        STRING: () => {
+            const string = token('STRING');
+            return {type: 'STRING', value: string.replaceAll('"', '')};
+        },
         CALL() {
             const name = token('NAME');
 
-            token('OPEN')
+            token('OPEN') //add(
             const args = []
             while (tokens[offset].type !== 'CLOSE') {
                 const argValue = rules.VALUE();
@@ -71,17 +80,64 @@ export function parse(tokens) {
         NUMBER() {
             const value = token('NUMBER')
             return {type: 'NUMBER', value: parseInt(value)}
-        }
+        },
     }
 
     return rules.ASSIGNMENT();
+}
+
+export function optimize(node) {
+    switch (node.type) {
+        case 'CALL':
+            if (node.name === 'add') {
+                const flattenedArguments = [];
+
+                node.arguments.forEach(arg => {
+                    if (arg.type === 'CALL' && arg.name === 'add') {
+                        flattenedArguments.push(...arg.arguments)
+                    } else {
+                        flattenedArguments.push(arg)
+                    }
+                });
+
+                const optimizedArguments = flattenedArguments.map(optimize);
+
+                const numberArguments = optimizedArguments.filter(a => a.type === 'NUMBER')
+                const otherArguments = optimizedArguments.filter(a => a.type !== 'NUMBER')
+
+                if (numberArguments.length) {
+                    let numberSum = numberArguments.reduce((acc, a) => acc + a.value, 0);
+                    const finalArguments = [{type: 'NUMBER', value: numberSum}, ...otherArguments]
+                    return {
+                        ...node,
+                        arguments: finalArguments
+                    }
+                } else {
+                    return {
+                        ...node,
+                        arguments: optimizedArguments
+                    }
+                }
+            }
+        case 'ASSIGN':
+            return {
+                ...node,
+                value: optimize(node.value)
+            }
+        case 'NUMBER':
+            return node
+        case 'VARIABLE':
+            return node
+        default:
+            throw new Error(`Unknown node type: ${node.type}`)
+    }
 }
 
 
 export function compile(node) {
     switch (node.type) {
         case 'ASSIGN':
-            return `let ${(node.variable)} = ${compile(node.value)}`;
+            return `let ${node.variable} = ${compile(node.value)}`;
         case 'CALL':
             if (node.name === 'add') {
                 return node.arguments.map(compile).join(' + ')

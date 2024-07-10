@@ -1,4 +1,4 @@
-import {compile, parse, tokenize} from "./minilang";
+import {compile, optimize, parse, tokenize} from "./minilang";
 
 describe('tokenizer', () => {
     it('a = add(b, 1)', () => {
@@ -13,6 +13,15 @@ describe('tokenizer', () => {
             {type: 'CLOSE', value: ')'},
         ])
     });
+
+    it('a = "foobar"', () => {
+        expect(tokenize('a = "foobar"')).toEqual([
+            {type: 'NAME', value: 'a'},
+            {type: 'ASSIGN', value: '='},
+            {type: 'STRING', value: '"foobar"'},
+        ])
+    });
+
 });
 
 describe('parser', () => {
@@ -23,6 +32,16 @@ describe('parser', () => {
             value: {
                 type: 'NUMBER',
                 value: 1
+            }
+        })
+    });
+    it('a = "hello"', () => {
+        expect(parse(tokenize('a = "hello"'))).toEqual({
+            type: 'ASSIGN',
+            variable: 'a',
+            value: {
+                type: 'STRING',
+                value: 'hello'
             }
         })
     });
@@ -89,6 +108,13 @@ describe('compiler', () => {
     it('a = add(add(1, 2), add(3, b))', () => {
         expect(compile(parse(tokenize('a = add(add(1, 2), add(3, b))')))).toEqual(
             'let a = 1 + 2 + 3 + b'
+        )
+    });
+});
+describe('optimizer', () => {
+    it('a = add(add(1, 2), add(3, b))', () => {
+        expect(compile(optimize(parse(tokenize('a = add(add(1, 2), add(3, b))'))))).toEqual(
+            'let a = 6 + b'
         )
     });
 
